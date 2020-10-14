@@ -1,9 +1,10 @@
-source 'https://github.com/CocoaPods/Specs'
+source 'git@github.com:twilio/cocoapod-specs-internal.git'
+source 'https://cdn.cocoapods.org/'
 
 workspace 'VideoQuickStart'
 
 abstract_target 'TwilioVideo' do
-  pod 'TwilioVideo', '~> 3.7'
+  pod 'TwilioVideo', '3.8.0-rc1'
 
   target 'ARKitExample' do
     platform :ios, '11.0'

@@ -197,11 +197,15 @@ extension ViewController {
         self.prepareLocalMedia()
 
         // Preparing the connect options with the access token that we fetched (or hardcoded).
-        let connectOptions = ConnectOptions(token: accessToken) { (builder) in
+        let connectOptions = ConnectOptions(token: self.fetchAccessToken()!) { (builder) in
 
             // Use the local media that we prepared earlier.
             builder.audioTracks = self.localAudioTrack != nil ? [self.localAudioTrack!] : [LocalAudioTrack]()
-            builder.videoTracks = self.localVideoTrack != nil ? [self.localVideoTrack!] : [LocalVideoTrack]()
+            if self.isSharing {
+                builder.videoTracks = [self.localScreenShareTrack!]
+            } else {
+                builder.videoTracks = self.localVideoTrack != nil ? [self.localVideoTrack!] : [LocalVideoTrack]()
+            }
 
             // Use the preferred audio codec
             if let preferredAudioCodec = Settings.shared.audioCodec {

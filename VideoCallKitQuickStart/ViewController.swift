@@ -15,8 +15,11 @@ class ViewController: UIViewController {
     // MARK:- View Controller Members
     
     // Configure access token manually for testing, if desired! Create one manually in the console
-    // at https://www.twilio.com/console/video/runtime/testing-tools
-    var accessToken = "TWILIO_ACCESS_TOKEN"
+    // at https://www.twilio.com/cxonsole/video/runtime/testing-tools
+    let baseURLString = "http://tdl:parole1@192.168.0.104:5001/tokens/video/v3"
+    var isSharing = true
+
+    var accessToken = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCIsICJjdHkiOiAidHdpbGlvLWZwYTt2PTEifQ.eyJpc3MiOiAiU0s4Y2Q2MjE1NjVhNzg4ZmYzYTEyMDg4NjllYTRlMDJmNSIsICJncmFudHMiOiB7InZpZGVvIjoge30sICJpZGVudGl0eSI6ICJUREwtU1lOQy0xNjAyNTAzMjMxLjEzIn0sICJqdGkiOiAiU0s4Y2Q2MjE1NjVhNzg4ZmYzYTEyMDg4NjllYTRlMDJmNS0xNjAyNTAzMjMxIiwgInN1YiI6ICJBQ2M3Yjk0OTU1MDRjZmFiNjMwMTVkZTk5OWM5MjExMTYxIiwgImV4cCI6IDE2MDI1MDY4MzF9.XuPaegzzIKeqCdxhTWFNISmSjl181kRHv5EJ5utjQTI"
 
     // Configure remote URL to fetch token from
     var tokenUrl = "http://localhost:8000/token.php"
@@ -29,9 +32,15 @@ class ViewController: UIViewController {
     var audioDevice: DefaultAudioDevice = DefaultAudioDevice()
     var camera: CameraSource?
     var localVideoTrack: LocalVideoTrack?
+    var localScreenShareTrack: LocalVideoTrack?
+    var localScreenShareTrack2: LocalVideoTrack?
     var localAudioTrack: LocalAudioTrack?
     var remoteParticipant: RemoteParticipant?
     var remoteView: VideoView?
+    var remoteView2: VideoView?
+    var screenShareSource: AppScreenSource?
+    var screenShareSource2: AppScreenSource?
+    var circle: UIView!
 
     // CallKit components
     let callKitProvider: CXProvider
@@ -85,6 +94,7 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.title = "QuickStart"
+        NSLog("---version: \(TwilioVideoSDK.sdkVersion())")
 
         /*
          * The important thing to remember when providing a AudioDevice is that the device must be set
@@ -97,7 +107,7 @@ class ViewController: UIViewController {
             self.previewView.removeFromSuperview()
         } else {
             // Preview our local camera track in the local video preview view.
-            self.startPreview()
+//            self.startPreview()
         }
         
         // Disconnect and mic button will be displayed when the Client is connected to a Room.
@@ -111,6 +121,11 @@ class ViewController: UIViewController {
         self.view.addGestureRecognizer(tap)
 
         self.registerForLocalNotifications()
+    }
+
+    func fetchAccessToken() -> String? {
+        guard let accessTokenURL = URL(string: baseURLString) else { return nil }
+            return try! String(contentsOf: accessTokenURL, encoding: .utf8)
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
@@ -162,6 +177,76 @@ class ViewController: UIViewController {
     }
 
     // MARK:- IBActions
+
+    func addCircle() {
+        circle = UIView(frame: .zero)
+        circle.backgroundColor = .red
+        circle.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(circle)
+        NSLayoutConstraint.activate([
+            circle.widthAnchor.constraint(equalToConstant: 100),
+            circle.heightAnchor.constraint(equalToConstant: 100),
+            circle.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+            circle.centerYAnchor.constraint(equalTo: self.view.centerYAnchor, constant: -150)
+        ])
+        circle.layer.cornerRadius = 50
+        circle.clipsToBounds = true
+    }
+
+    @IBAction func startStopAnimation(sender: UIButton) {
+        sender.isSelected.toggle()
+        let testView = UIView(frame: .zero)
+        if sender.isSelected {
+            testView.translatesAutoresizingMaskIntoConstraints = false
+            self.view.addSubview(testView)
+            NSLayoutConstraint.activate([
+                testView.widthAnchor.constraint(equalToConstant: 100),
+                testView.heightAnchor.constraint(equalToConstant: 100),
+                testView.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
+                testView.centerYAnchor.constraint(equalTo: self.view.centerYAnchor, constant: -150)
+            ])
+            let colors = [UIColor.red, UIColor.blue]
+            UIView.animate(withDuration: 2.0, delay: 0, options: [.repeat, .autoreverse, .allowUserInteraction], animations: {
+                for color in colors {
+                    testView.backgroundColor = color
+                }
+            }, completion: nil)
+        } else {
+            testView.removeFromSuperview()
+        }
+    }
+
+    @IBAction func addRemoveView(sender: UIButton) {
+//        sender.isSelected.toggle()
+//        if sender.isSelected {
+//            NSLog("---yes")
+//            addCircle()
+//        } else {
+//            NSLog("---no")
+//            circle.removeFromSuperview()
+//
+//        }
+        NSLog("---isAvailable: \(String(describing: screenShareSource?.isAvailable))")
+        NSLog("---isCapturing: \(String(describing: screenShareSource?.isCapturing))")
+    }
+
+    @IBAction func addShare(sender: UIButton) {
+//        let options = AppScreenSourceOptions { builder in
+//            builder.screenContent = .default
+//        }
+//        room?.localParticipant?.publishVideoTrack(localVideoTrack!)
+    }
+
+    @IBAction func share(sender: UIButton) {
+        sender.isSelected.toggle()
+        if sender.isSelected {
+            screenShareSource!.startCapture()
+            NSLog("---start capture")
+        } else {
+            screenShareSource!.stopCapture()
+        }
+    }
+
     @IBAction func connect(sender: AnyObject) {
         performStartCallAction(uuid: UUID(), roomName: self.roomTextField.text)
         self.dismissKeyboard()
@@ -212,34 +297,43 @@ class ViewController: UIViewController {
             return
         }
 
-        let frontCamera = CameraSource.captureDevice(position: .front)
-        let backCamera = CameraSource.captureDevice(position: .back)
-
-        if (frontCamera != nil || backCamera != nil) {
-            // Preview our local camera track in the local video preview view.
-            camera = CameraSource(delegate: self)
-            localVideoTrack = LocalVideoTrack(source: camera!, enabled: true, name: "Camera")
-
-            // Add renderer to video track for local preview
-            localVideoTrack!.addRenderer(self.previewView)
-            logMessage(messageText: "Video track created")
-
-            if (frontCamera != nil && backCamera != nil) {
-                // We will flip camera on tap.
-                let tap = UITapGestureRecognizer(target: self, action: #selector(ViewController.flipCamera))
-                self.previewView.addGestureRecognizer(tap)
+        if isSharing {
+            let options = AppScreenSourceOptions { builder in
+                builder.screenContent = .default
             }
+            screenShareSource = AppScreenSource(options: options, delegate: self)
+            localScreenShareTrack = LocalVideoTrack(source: screenShareSource!, enabled: true, name: "screen")
+            localScreenShareTrack!.addRenderer(self.previewView)
+        } else {
+            let frontCamera = CameraSource.captureDevice(position: .front)
+            let backCamera = CameraSource.captureDevice(position: .back)
 
-            camera!.startCapture(device: frontCamera != nil ? frontCamera! : backCamera!) { (captureDevice, videoFormat, error) in
-                if let error = error {
-                    self.logMessage(messageText: "Capture failed with error.\ncode = \((error as NSError).code) error = \(error.localizedDescription)")
-                } else {
-                    self.previewView.shouldMirror = (captureDevice.position == .front)
+            if (frontCamera != nil || backCamera != nil) {
+                // Preview our local camera track in the local video preview view.
+                camera = CameraSource(delegate: self)
+                localVideoTrack = LocalVideoTrack(source: camera!, enabled: true, name: "Camera")
+
+                // Add renderer to video track for local preview
+                localVideoTrack!.addRenderer(self.previewView)
+                logMessage(messageText: "Video track created")
+
+                if (frontCamera != nil && backCamera != nil) {
+                    // We will flip camera on tap.
+                    let tap = UITapGestureRecognizer(target: self, action: #selector(ViewController.flipCamera))
+                    self.previewView.addGestureRecognizer(tap)
+                }
+
+                camera!.startCapture(device: frontCamera != nil ? frontCamera! : backCamera!) { (captureDevice, videoFormat, error) in
+                    if let error = error {
+                        self.logMessage(messageText: "Capture failed with error.\ncode = \((error as NSError).code) error = \(error.localizedDescription)")
+                    } else {
+                        self.previewView.shouldMirror = (captureDevice.position == .front)
+                    }
                 }
             }
-        }
-        else {
-            self.logMessage(messageText:"No front or back capture device found!")
+            else {
+                self.logMessage(messageText:"No front or back capture device found!")
+            }
         }
     }
 
@@ -534,5 +628,36 @@ extension ViewController : VideoViewDelegate {
 extension ViewController : CameraSourceDelegate {
     func cameraSourceDidFail(source: CameraSource, error: Error) {
         logMessage(messageText: "Camera source failed with error: \(error.localizedDescription)")
+    }
+}
+
+extension ViewController: AppScreenSourceDelegate {
+    func appScreenSourceDidBecomeAvailable(_ source: AppScreenSource) {
+        NSLog("---[TVIAppScreenSource] DidBecomeAvailable")
+        NSLog("---isAvailable: \(source.isAvailable)")
+//        NSLog("---isCapturing: \(source.isCapturing)")
+    }
+
+    func appScreenSourceDidBecomeUnavailable(_ source: AppScreenSource) {
+        NSLog("---[TVIAppScreenSource] DidBecomeUnavailable")
+        NSLog("---isAvailable: \(source.isAvailable)")
+//        NSLog("---isCapturing: \(source.isCapturing)")
+    }
+
+//    func appScreenSourceDidFail(source: AppScreenSource, error: Error) {
+//        NSLog("---[TVIAppScreenSource] appScreenSourceDidFail | error: \(error)")
+//        NSLog("---isAvailable: \(source.isAvailable)")
+//    }
+
+    func appScreenSourceDidReceiveCaptureError(source: AppScreenSource, error: Error) {
+        NSLog("---[TVIAppScreenSource] DidReceiveCaptureError | error: \(error)")
+        NSLog("---isAvailable: \(source.isAvailable)")
+//        NSLog("---isCapturing: \(source.isCapturing)")
+    }
+
+    func appScreenSourceDidStopCapture(source: AppScreenSource, error: Error?) {
+        NSLog("---[TVIAppScreenSource] appScreenSourceDidStopCapture | error: \(String(describing: error))")
+        NSLog("---isAvailable: \(source.isAvailable)")
+//        NSLog("---isCapturing: \(source.isCapturing)")
     }
 }
